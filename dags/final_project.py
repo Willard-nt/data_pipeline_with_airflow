@@ -2,24 +2,29 @@ from datetime import datetime, timedelta
 import pendulum
 import os
 from airflow.decorators import dag
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from operators import (StageToRedshiftOperator, LoadFactOperator,
                        LoadDimensionOperator, DataQualityOperator)
 from helpers import SqlQueries
 
 default_args = {
     'owner': 'udacity',
+    'retries': 3,
+    'retry_delay': timedelta(minutes=5),
+    'depends_on_past': False,
+    'email_on_retry': False,
+    'catchup': False,
     'start_date': pendulum.now(),
 }
 
 @dag(
     default_args=default_args,
     description='Load and transform data in Redshift with Airflow',
-    schedule_interval='0 * * * *'
+    schedule='0 * * * *'
 )
 def final_project():
 
-    start_operator = DummyOperator(task_id='Begin_execution')
+    start_operator = EmptyOperator(task_id='Begin_execution')
 
     stage_events_to_redshift = StageToRedshiftOperator(
         task_id='Stage_events',
