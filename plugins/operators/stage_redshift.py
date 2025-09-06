@@ -1,24 +1,37 @@
-from airflow.hooks.postgres_hook import PostgresHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import BaseOperator
-from airflow.utils.decorators import apply_defaults
 
 class StageToRedshiftOperator(BaseOperator):
     ui_color = '#358140'
 
-    @apply_defaults
-    def __init__(self,
-                 # Define your operators params (with defaults) here
-                 # Example:
-                 # redshift_conn_id=your-connection-name
-                 *args, **kwargs):
+    def __init__(
+                self,
+                redshift_conn_id: str,
+                create_staging_events_table: str,
+                create_staging_songs_table: str,
+                 **kwargs
+                 ):
 
-        super(StageToRedshiftOperator, self).__init__(*args, **kwargs)
-        # Map params here
-        # Example:
-        # self.conn_id = conn_id
+        super(StageToRedshiftOperator, self).__init__(**kwargs)
+        self.redshift_conn_id = redshift_conn_id
+        self.create_staging_events_table = create_staging_events_table
+        self.create_staging_songs_table = create_staging_songs_table
+
 
     def execute(self, context):
-        self.log.info('StageToRedshiftOperator not implemented yet')
+        self.log.info("Connecting to Redshift database")
+        redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
+
+        if self.create_staging_events_table:
+            self.log.info("Creating staging events table")
+            redshift.run(self.create_staging_events_table)
+
+        if self.create_staging_songs_table:
+            self.log.info("Creating staging songs table")
+            redshift.run(self.create_staging_songs_table)
+
+        self.log.info("Both tables created successfully")
+
 
 
 
