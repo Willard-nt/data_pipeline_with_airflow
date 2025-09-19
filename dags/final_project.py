@@ -1,107 +1,109 @@
 from datetime import datetime, timedelta
-import pendulum
 import os
 from airflow.decorators import dag
 from airflow.operators.empty import EmptyOperator
-from operators import (StageToRedshiftOperator, LoadFactOperator,
+from operators import (CreateTablesOperator, StageToRedshiftOperator, LoadFactOperator,
                        LoadDimensionOperator, DataQualityOperator)
+
+from operators.stage_redshift import copy_staging_events, copy_staging_songs
+
 from helpers import SqlQueries
+from helpers.create_statements import tables_list
 
 default_args = {
-    'owner': 'udacity',
+    'owner': 'student',
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
     'depends_on_past': False,
     'email_on_retry': False,
     'catchup': False,
-    'start_date': pendulum.now(),
 }
 
 @dag(
     default_args=default_args,
+    start_date= datetime(2018, 11, 1),
+    end_date=datetime(2018, 11, 2),
     description='Load and transform data in Redshift with Airflow',
-    schedule='0 * * * *'
+    schedule='@daily'
 )
 def final_project():
 
     start_operator = EmptyOperator(task_id='Begin_execution')
 
+
+    create_tables_redshift = CreateTablesOperator(
+        task_id='create_tables',
+        redshift_conn_id='redshift',
+        sql_list=tables_list
+    )
+
     stage_events_to_redshift = StageToRedshiftOperator(
         task_id='Stage_events',
         redshift_conn_id='redshift',
-        create_staging_events_table="""
-            DROP table IF EXISTS public.staging_events;
-                CREATE TABLE public.staging_events (
-	            artist varchar(256),
-	            auth varchar(256),
-	            firstname varchar(256),
-	            gender varchar(256),
-	            iteminsession int4,
-	            lastname varchar(256),
-	            length numeric(18,0),
-	            "level" varchar(256),
-	            location varchar(256),
-	            "method" varchar(256),
-	            page varchar(256),
-	            registration numeric(18,0),
-	            sessionid int4,
-	            song varchar(256),
-	            status int4,
-	            ts int8,
-	            useragent varchar(256),
-	            userid int4
-            );""",
-                create_staging_songs_table=None
-
+        copy_staging_events=copy_staging_events
+        
     )
 
     stage_songs_to_redshift = StageToRedshiftOperator(
         task_id='Stage_songs',
         redshift_conn_id='redshift',
-        create_staging_events_table=None,
-        create_staging_songs_table="""
-            DROP table IF EXISTS public.songs;
-                CREATE TABLE public.staging_songs (
-	            num_songs int4,
-	            artist_id varchar(256),
-	            artist_name varchar(512),
-	            artist_latitude numeric(18,0),
-	            artist_longitude numeric(18,0),
-	            artist_location varchar(512),
-	            song_id varchar(256),
-	            title varchar(512),
-	            duration numeric(18,0),
-	            "year" int4
-            );"""
-                
+        copy_staging_songs=copy_staging_songs
 
-)
+    )
 
     load_songplays_table = LoadFactOperator(
         task_id='Load_songplays_fact_table',
+        redshift_conn_id='redshift',
+        sql=SqlQueries.songplay_table_insert,
+        append_only=True
+        
     )
 
     load_user_dimension_table = LoadDimensionOperator(
         task_id='Load_user_dim_table',
+        redshift_conn_id='redshift',
+        table='users',
+        sql=SqlQueries.user_table_insert,
+        mode='overwrite'
     )
 
     load_song_dimension_table = LoadDimensionOperator(
         task_id='Load_song_dim_table',
+        redshift_conn_id='redshift',
+        table='songs',
+        sql=SqlQueries.song_table_insert,
+        mode='overwrite'
     )
 
     load_artist_dimension_table = LoadDimensionOperator(
         task_id='Load_artist_dim_table',
+        redshift_conn_id='redshift',
+        table='artists',
+        sql=SqlQueries.artist_table_insert,
+        mode='overwrite'
     )
 
     load_time_dimension_table = LoadDimensionOperator(
         task_id='Load_time_dim_table',
+        redshift_conn_id='redshift',
+        table='time',
+        sql=SqlQueries.time_table_insert,
+        mode='overwrite'
     )
 
     run_quality_checks = DataQualityOperator(
         task_id='Run_data_quality_checks',
+        redshift_conn_id='redshift',
+        tables=['songplays', 'users', 'songs', 'artists', 'time']
     )
 
-    start_operator >> [stage_events_to_redshift, stage_songs_to_redshift]
+
+    end_operator = EmptyOperator(task_id='End_execution')
+
+
+    start_operator >> create_tables_redshift >> [stage_events_to_redshift, stage_songs_to_redshift] >> load_songplays_table
+    load_songplays_table >> [load_user_dimension_table, load_song_dimension_table, load_artist_dimension_table, load_time_dimension_table] >> run_quality_checks
+    run_quality_checks >> end_operator
 
 final_project_dag = final_project()
 
