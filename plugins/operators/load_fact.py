@@ -1,22 +1,32 @@
-from airflow.hooks.postgres_hook import PostgresHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import BaseOperator
-from airflow.utils.decorators import apply_defaults
 
 class LoadFactOperator(BaseOperator):
-
     ui_color = '#F98866'
 
-    @apply_defaults
     def __init__(self,
-                 # Define your operators params (with defaults) here
-                 # Example:
-                 # conn_id = your-connection-name
-                 *args, **kwargs):
+                redshift_conn_id: str,
+                sql: str,
+                append_only:bool = True,
+                 **kwargs):
 
-        super(LoadFactOperator, self).__init__(*args, **kwargs)
-        # Map params here
-        # Example:
-        # self.conn_id = conn_id
+        super(LoadFactOperator, self).__init__(**kwargs)
+        self.redshift_conn_id = redshift_conn_id
+        self.sql = sql
+        self.append_only = append_only
 
     def execute(self, context):
-        self.log.info('LoadFactOperator not implemented yet')
+        
+        self.log.info("Connecting to Redshift database")
+        redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
+
+        if self.append_only:
+            self.log.info("Appending data to fact table")
+            redshift.run(self.sql)
+
+        else:
+            self.log.info("Overwriting data in songplays table")
+            redshift.run("DELETE FROM songplays;")
+            redshift.run(self.sql)
+
+        self.log.info("Insert data into songplays table is successful")
