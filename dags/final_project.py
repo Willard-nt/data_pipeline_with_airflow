@@ -5,26 +5,24 @@ from airflow.operators.empty import EmptyOperator
 from operators import (CreateTablesOperator, StageToRedshiftOperator, LoadFactOperator,
                        LoadDimensionOperator, DataQualityOperator)
 
-from operators.stage_redshift import copy_staging_events, copy_staging_songs
-
 from helpers import SqlQueries
 from helpers.create_statements import tables_list
 
 default_args = {
-    'owner': 'student',
+    'owner': 'Will',
     'retries': 3,
     'retry_delay': timedelta(minutes=5),
     'depends_on_past': False,
     'email_on_retry': False,
+    'start_date': datetime(2018, 11, 1),
     'catchup': False,
 }
 
 @dag(
     default_args=default_args,
-    start_date= datetime(2018, 11, 1),
     end_date=datetime(2018, 11, 2),
     description='Load and transform data in Redshift with Airflow',
-    schedule='@daily'
+    schedule='0 * * * *'
 )
 def final_project():
 
@@ -38,16 +36,24 @@ def final_project():
     )
 
     stage_events_to_redshift = StageToRedshiftOperator(
-        task_id='Stage_events',
+        task_id='stage_events',
         redshift_conn_id='redshift',
-        copy_staging_events=copy_staging_events
+        aws_conn_id='aws_default',
+        table='staging_events',
+        s3_bucket='ghostface-cowboy',
+        s3_key='log_data/2018/11/{ds}-events.json',
+        json_format='s3://ghostface-cowboy/log_json_path.json'
         
     )
 
     stage_songs_to_redshift = StageToRedshiftOperator(
-        task_id='Stage_songs',
+        task_id='stage_songs',
         redshift_conn_id='redshift',
-        copy_staging_songs=copy_staging_songs
+        aws_conn_id='aws_default',
+        table='staging_songs',
+        s3_bucket='ghostface-cowboy',
+        s3_key='song-data/A/A/A/',
+        json_format='auto'
 
     )
 
@@ -94,7 +100,13 @@ def final_project():
     run_quality_checks = DataQualityOperator(
         task_id='Run_data_quality_checks',
         redshift_conn_id='redshift',
-        tables=['songplays', 'users', 'songs', 'artists', 'time']
+        tests=[
+            {'sql': 'SELECT COUNT(*) FROM songplays;', 'expected': 1},
+            {'sql': 'SELECT COUNT(*) FROM users;', 'expected': 1},
+            {'sql': 'SELECT COUNT(*) FROM songs;', 'expected': 1},
+            {'sql': 'SELECT COUNT(*) FROM artists;', 'expected': 1},
+            {'sql': 'SELECT COUNT(*) FROM time;', 'expected': 1}
+        ]
     )
 
 
@@ -106,4 +118,3 @@ def final_project():
     run_quality_checks >> end_operator
 
 final_project_dag = final_project()
-
