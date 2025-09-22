@@ -1,28 +1,37 @@
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import BaseOperator
 from airflow.exceptions import AirflowException
-class DataQualityOperator(BaseOperator):
 
+class DataQualityOperator(BaseOperator):
     ui_color = '#89DA59'
 
     def __init__(self,
                  redshift_conn_id: str,
-                 tables: '',
+                 tests: list,
                  **kwargs):
-
-        super(DataQualityOperator, self).__init__(**kwargs)
+        
+        super().__init__(**kwargs)
         self.redshift_conn_id = redshift_conn_id
-        self.tables = tables or []
+        self.tests = tests or []
 
     def execute(self, context):
-        self.log.info('Connecting to Redshift database')
+        if not self.tests:
+            raise AirflowException("No data quality tests provided.")
+
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
 
-        for table in self.tables:
-            self.log.info(f"Running data quality check on table: {table}")
-            records = redshift.get_records(f"SELECT COUNT(*) FROM {table};")
+        for test in self.tests:
+            sql = test.get('sql')
+            expected = test.get('expected')
 
-            if not records or records[0][0] < 1:
-                raise AirflowException(f"Data quality check failed: {table} returned no rows.")
-            else:
-                self.log.info(f"Data quality check passed for {table}: {records[0][0]} records found.")
+            if not sql or expected is None:
+                raise AirflowException("Each test must include 'sql' and 'expected'.")
+
+            self.log.info(f"Running data quality test: {sql}")
+            result = redshift.get_records(sql)
+
+            if not result or result[0][0] < expected:
+                raise AirflowException(
+                    f"Data quality test failed.\nSQL: {sql}\nExpected at least: {expected}\nGot: {result[0][0]}"
+                )
+            self.log.info(f"Test passed. SQL: {sql} returned {result[0][0]}")
