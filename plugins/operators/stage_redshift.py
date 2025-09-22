@@ -1,59 +1,54 @@
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.models import BaseOperator
-
-copy_staging_events = ("""
-        COPY staging_events
-        FROM 's3://ghostface-cowboy/log_data/2018/11/{{ ds }}-events.json'
-        IAM_ROLE 'arn:aws:iam::616717107464:role/my-redshift-service-role'
-        FORMAT AS JSON 's3://ghostface-cowboy/log_json_path.json'
-        TIMEFORMAT 'auto'
-        ACCEPTANYDATE
-        MAXERROR 100
-    """)
-
-copy_staging_songs = ("""
-        COPY staging_songs
-        FROM 's3://ghostface-cowboy/song-data/A/A/A/'
-        IAM_ROLE 'arn:aws:iam::616717107464:role/my-redshift-service-role'
-        FORMAT AS JSON 'auto'
-    """)
-
+from airflow.hooks.base import BaseHook
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 
 class StageToRedshiftOperator(BaseOperator):
-    template_fields = ['copy_staging_events']
-    ui_color = '#358140'
+    template_field = ('s3_key')
 
     def __init__(
-                self,
-                redshift_conn_id: str,
-                copy_staging_events: str = None,
-                copy_staging_songs: str = None,
-                 **kwargs
-                 ):
-
-        super(StageToRedshiftOperator, self).__init__(**kwargs)
+        self,
+        *,
+        redshift_conn_id: str,
+        aws_conn_id: str,
+        table: str,
+        s3_bucket: str,
+        s3_key: str,
+        json_format: str = 'auto',
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
         self.redshift_conn_id = redshift_conn_id
-        self.copy_staging_events = copy_staging_events
-        self.copy_staging_songs = copy_staging_songs
-       
-
+        self.aws_conn_id = aws_conn_id
+        self.table = table
+        self.s3_bucket = s3_bucket
+        self.s3_key = s3_key
+        self.json_format = json_format
 
     def execute(self, context):
-        
-        self.log.info("Connecting to Redshift database")
         redshift = PostgresHook(postgres_conn_id=self.redshift_conn_id)
 
-        if self.copy_staging_events:
-            self.log.info("Copying event data from s3")
-            redshift.run(self.copy_staging_events)
+        aws_conn = BaseHook.get_connection(self.aws_conn_id)
+        access_key = aws_conn.login
+        secret_key = aws_conn.password
 
-        if self.copy_staging_songs:
-            self.log.info("Copying song data from s3")
-            redshift.run(self.copy_staging_songs)
+        rendered_key = self.s3_key.format(**context)
+        s3_path = f's3://{self.s3_bucket}/{rendered_key}'
 
-        self.log.info("Event and song data have been copied successfully")
+        self.log.info(f'Copying data from {s3_path} to Redshift table {self.table}')
 
+    
+        if self.json_format.lower() == 'auto':
+            format_option = "FORMAT AS JSON 'auto'"
+        else:
+            format_option = f"FORMAT AS JSON '{self.json_format}'"
 
+        copy_sql = f"""
+            COPY {self.table}
+            FROM '{s3_path}'
+            ACCESS_KEY_ID '{access_key}'
+            SECRET_ACCESS_KEY '{secret_key}'
+            {format_option};
+        """
 
-__all__ = ['StageToRedshiftOperator', 'copy_staging_events', 'copy_staging_songs']
-
+        redshift.run(copy_sql)
+        self.log.info(f'Successfully copied data to {self.table}')
