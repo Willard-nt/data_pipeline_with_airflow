@@ -21,7 +21,7 @@ The project was built using a provided template that included:
 - A helper class for SQL transformations
 
 The DAG was visualized and executed within the Airflow UI.  
-**Visualization Placeholder:**  
+
 ![Visual of DAG graph](assets/DAG_Graph.png)
 
 ---
@@ -112,7 +112,7 @@ Raised exceptions if test results did not match expected values.
 ## Execution Results
 All tasks were successfully executed in Airflow. Each task showed a green "Success" status in the DAG graph view.
 
-![Visual of succesful DAG run](assets/successful_DAG_Run.png)
+![Visual of successful DAG run](assets/Successful_DAG_Run.png)
 
 ## Notes
 The project reused logic from previous ETL implementations but leveraged Airflow's hooks and connections for modularity.
