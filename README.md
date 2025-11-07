@@ -22,7 +22,7 @@ The project was built using a provided template that included:
 
 The DAG was visualized and executed within the Airflow UI.  
 **Visualization Placeholder:**  
-![Visual of DAG graph](.png)
+![Visual of DAG graph](assets/DAG_Graph.png)
 
 ---
 
@@ -83,7 +83,7 @@ All dimension loads → Run_data_quality_checks
 
 Run_data_quality_checks → End_execution
 
-![Dependencies](.png)
+![Dependencies](assets/DAG_Dependencies.png)
 
 ## Custom Operators
 1. CreateTablesOperator
@@ -112,7 +112,7 @@ Raised exceptions if test results did not match expected values.
 ## Execution Results
 All tasks were successfully executed in Airflow. Each task showed a green "Success" status in the DAG graph view.
 
-![Visual of succesful DAG run](.png)
+![Visual of succesful DAG run](assets/successful_DAG_Run.png)
 
 ## Notes
 The project reused logic from previous ETL implementations but leveraged Airflow's hooks and connections for modularity.
