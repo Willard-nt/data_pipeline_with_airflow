@@ -35,7 +35,7 @@ To ensure Redshift could access the data efficiently, the datasets were copied f
 #### Steps Taken:
 ```bash
 # Create a new S3 bucket
-aws s3 mb s3://your-unique-bucket-name/
+aws s3 mb s3://my-bucket/
 
 # Copy data from Udacity's bucket to CloudShell
 aws s3 cp s3://udacity-dend/log-data/ ~/log-data/ --recursive
@@ -43,9 +43,9 @@ aws s3 cp s3://udacity-dend/song-data/ ~/song-data/ --recursive
 aws s3 cp s3://udacity-dend/log_json_path.json ~/
 
 # Upload data to your own S3 bucket
-aws s3 cp ~/log-data/ s3://your-unique-bucket-name/log-data/ --recursive
-aws s3 cp ~/song-data/ s3://your-unique-bucket-name/song-data/ --recursive
-aws s3 cp ~/log_json_path.json s3://your-unique-bucket-name/
+aws s3 cp ~/log-data/ s3://my-bucket/log-data/ --recursive
+aws s3 cp ~/song-data/ s3://my-bucket/song-data/ --recursive
+aws s3 cp ~/log_json_path.json s3://my-bucket/
 ```
 ## DAG Configuration
 The DAG was configured with the following default parameters:
