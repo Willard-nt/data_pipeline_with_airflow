@@ -112,7 +112,7 @@ Raised exceptions if test results did not match expected values.
 ## Execution Results
 All tasks were successfully executed in Airflow. Each task showed a green "Success" status in the DAG graph view.
 
-![Visual of succesful DAG graph](.png)
+![Visual of succesful DAG run](.png)
 
 ## Notes
 The project reused logic from previous ETL implementations but leveraged Airflow's hooks and connections for modularity.
